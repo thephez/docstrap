@@ -44,6 +44,7 @@ var navOptions = {
   collapseSymbols: conf.collapseSymbols || false,
   inverseNav: conf.inverseNav,
   outputSourceFiles: conf.outputSourceFiles === true,
+  outputRepositoryLinks: conf.outputRepositoryLinks === true,
   sourceRootPath: conf.sourceRootPath,
   disablePackagePath: conf.disablePackagePath,
   outputSourcePath: conf.outputSourcePath,
@@ -277,6 +278,7 @@ function generate(docType, title, docs, filename, resolveLinks) {
       "title": title,
       "body": searchData(html)
     };
+
   }
 
   fs.writeFileSync(outpath, html, 'utf8');
@@ -287,6 +289,7 @@ function generateSourceFiles(sourceFiles) {
     var source;
     // links are keyed to the shortened path in each doclet's `meta.shortpath` property
     var sourceOutfile = helper.getUniqueFilename(sourceFiles[file].shortened);
+
     helper.registerLink(sourceFiles[file].shortened, sourceOutfile);
 
     try {
@@ -302,6 +305,40 @@ function generateSourceFiles(sourceFiles) {
       false);
   });
 }
+
+function generateRepoLinks(sourceFiles) {
+  Object.keys(sourceFiles).forEach(function(file) {
+    var source;
+    // links are keyed to the shortened path in each doclet's `meta.shortpath` property
+    var sourceOutfile = helper.getUniqueFilename(sourceFiles[file].shortened);
+
+    //console.log(file);
+    var reposrc = "/repos/";
+    var repo_and_file = file.substring(file.indexOf(reposrc) + reposrc.length);
+    //console.log(repo_and_file);
+    var repo = repo_and_file.split("/")[0];
+    var repo_file = repo_and_file.substring(repo_and_file.indexOf("/"));
+    //console.log(repo_file);
+    //console.log(repo);
+    var branch = "v3_develop"
+    var repo_link = "https://github.com/dashevo/" + repo + "/blob/" + branch +"/" + repo_file;
+
+    helper.registerLink(sourceFiles[file].shortened, repo_link);
+
+    try {
+      source = {
+        kind: 'source',
+        code: helper.htmlsafe(fs.readFileSync(sourceFiles[file].resolved, 'utf8'))
+      };
+    } catch (e) {
+      handle(e);
+    }
+
+    generate('source', 'Source: ' + sourceFiles[file].shortened, [source], sourceOutfile,
+      false);
+  });
+}
+
 
 /**
  * Look for classes or functions with the same name as modules (which indicates that the module
@@ -708,6 +745,14 @@ exports.publish = function(taffyData, opts, tutorials) {
   // pages, so the other pages can link to the source files
   if (navOptions.outputSourceFiles) {
     generateSourceFiles(sourceFiles);
+    //generateRepoLinks(sourceFiles);
+  }
+
+  // only output repository source links if requested; do this before generating any other
+  // pages, so the other pages can link to the source files
+  if (navOptions.outputRepositoryLinks) {
+    console.log("Creating repo links")
+    generateRepoLinks(sourceFiles);
   }
 
   if (members.globals.length) {
